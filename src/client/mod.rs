@@ -312,6 +312,8 @@ impl Certificate {
 pub struct ClientOptions {
     user_agent: Option<ConfigValue<HeaderValue>>,
     #[cfg(not(target_arch = "wasm32"))]
+    rustls_tls: bool,
+    #[cfg(not(target_arch = "wasm32"))]
     root_certificates: Vec<Certificate>,
     content_type_map: HashMap<String, String>,
     default_content_type: Option<String>,
@@ -345,6 +347,8 @@ impl Default for ClientOptions {
         // we opt for a slightly higher default timeout of 30 seconds
         Self {
             user_agent: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            rustls_tls: false,
             #[cfg(not(target_arch = "wasm32"))]
             root_certificates: Default::default(),
             content_type_map: Default::default(),
@@ -475,6 +479,15 @@ impl ClientOptions {
     #[cfg(not(target_arch = "wasm32"))]
     pub fn with_root_certificate(mut self, certificate: Certificate) -> Self {
         self.root_certificates.push(certificate);
+        self
+    }
+
+    /// Select rustls instead of the default reqwest TLS backend.
+    ///
+    /// The default is false and lets reqwest select the backend.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn with_rustls_tls(mut self, enabled: bool) -> Self {
+        self.rustls_tls = enabled;
         self
     }
 
@@ -746,6 +759,9 @@ impl ClientOptions {
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn client(&self) -> Result<reqwest::Client> {
         let mut builder = reqwest::ClientBuilder::new();
+        if self.rustls_tls {
+            builder = builder.use_rustls_tls();
+        }
 
         match &self.user_agent {
             Some(user_agent) => builder = builder.user_agent(user_agent.get()?),
